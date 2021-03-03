@@ -1,0 +1,1573 @@
+<?php
+  require_once('../wp-load.php');
+
+  $PhysicianId=$_GET['pId'];
+  $SQL= "SELECT * FROM `wp_users` u LEFT JOIN wp_usermeta um ON u.ID = um.user_id WHERE u.ID='".$PhysicianId."'";
+  $UserDetails = $wpdb->get_row($SQL);
+
+  if ($UserDetails->ID  ==""){
+      //TODO: Add log that someone tried to access an intake without a pID
+      //exit;
+  }
+
+  $PhysicianName=$UserDetails->display_name;
+
+  $SQL = "SELECT value FROM `wp_bp_xprofile_data` where field_id=10 AND user_id='".$PhysicianId."'";		
+  $resultsState = $wpdb->get_row($SQL);
+
+  $pState = $resultsState->value;
+
+  //IF USER'S STATE IS EMPTY BECAUSE THEY ARE A SUB-USER THEN PULL STATE FROM OFFICE LOCATION
+  if($pState==""){
+    $Offices = getOfficeInfo($PhysicianId);
+    $pState = $Offices['State'];
+  }
+
+  $PhysicianState = convertState($pState);
+
+  $Provinces = array("Alberta",  "British Columbia",  "Manitoba",  "New Brunswick",  "Newfoundland and Labrador",  "Nova Scotia",  "Ontario",  "Prince Edward Island",  "Quebec",  "Saskatchewan");
+  if (in_array($PhysicianState, $Provinces)) { 
+    $isCanadian=true;
+  } else {
+    $isCanadian=false;
+  }
+
+
+?>
+
+<!doctype html>
+<html class="no-js"
+      lang="">
+
+  <head>
+    <meta charset="utf-8">
+    <title>Intake Form</title>
+    <meta name="description"
+          content="Description Placeholder">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <!-- Place favicon.ico in the root directory -->
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
+    <link rel="stylesheet"
+          href="css/main.css">
+  </head>
+
+  <body>
+    <div class="ui tiny modal">
+      <div class="header">
+        Physician ID Not Found
+      </div>
+      <div class="content">
+        <p>
+          We're sorry, but the Patient Intake Form requires a Physician ID.
+        </p>
+      </div>
+      <!-- <div class="actions">
+        <div class="ui button">OK</div>
+      </div> -->
+    </div>
+
+    <div class="ui container">
+      <h1 id="pageHeader"
+          class="ui header">
+        New Patient Intake Form
+        <div class="sub header">Enter your information below to register as a new patient for <?=$PhysicianName?>.</div>
+      </h1>
+
+      <form>
+        <!-- SEGMENT: Contact Information -->
+        <h2 class="ui top attached header">
+          Contact Information
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="required field">
+                <label>Full Name</label>
+                <input type="text"
+                       placeholder="Full Name"
+                       id="Name"
+                       name="Name"
+                       required>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="field">
+                <label>Home Phone</label>
+                <input type="tel"
+                       placeholder="555-555-5555"
+                       id="Home_Phone"
+                       name="Home_Phone">
+              </div>
+              <div class="required field">
+                <label>Cell Phone</label>
+                <input type="tel"
+                       placeholder="555-555-5555"
+                       id="Cell_Phone"
+                       name="Cell_Phone"
+                       required>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Email Address</label>
+                <input type="email"
+                       placeholder="your@email.com"
+                       id="Email"
+                       name="Email"
+                       required>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Address</label>
+                <input type="text"
+                       placeholder="55555 Sesame St."
+                       id="Address"
+                       name="Address"
+                       required>
+              </div>
+              <div class="field">
+                <label>Address Line 2</label>
+                <input type="text"
+                       placeholder=""
+                       id="Address_Line_2"
+                       name="Address_Line_2">
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>City</label>
+                <input type="text"
+                       placeholder="City"
+                       id="City"
+                       name="City"
+                       required>
+              </div>
+              <div class="required disabled field">
+                <label>State</label>
+                <div class="ui selection dropdown">
+                  <input type="hidden"
+                         id="State"
+                         name="State" value="<?=$PhysicianState?>">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">State</div>
+                  <div class="menu stateDropdown">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>ZIP Code</label>
+                <input type="text"
+                       placeholder="ZIP Code"
+                       id="Zipcode"
+                       name="Zipcode"
+                       required>
+              </div>
+              <div class="required field">
+                <label>County</label>
+                <input type="text"
+                       placeholder="County"
+                       id="County"
+                       name="County"
+                       required>
+              </div>
+            </div>
+          </div>
+
+          <!-- <div class="ui divider"></div>
+
+          <button id="btnContactInformation"
+                  class="fluid ui huge primary basic button">Scroll to Patient Information</button> -->
+        </div>
+        <!-- END SEGMENT: Contact Information -->
+
+        <div id="patientInformation"
+             class="ui divider segmentDivider"></div>
+
+        <!-- SEGMENT: Patient Information -->
+        <h2 class="ui top attached header">
+          Patient Information
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="required field">
+                <label>Sex</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Sex"
+                         name="Sex">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Select your sex</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Male">Male</div>
+                    <div class="item"
+                         data-value="Female">Female</div>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label>Gender</label>
+                <div class="ui selection dropdown">
+                  <input type="hidden"
+                         id="Gender"
+                         name="Gender">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Select if different than Sex</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Male">Male</div>
+                    <div class="item"
+                         data-value="Female">Female</div>
+                    <div class="item"
+                         data-value="Other">Other</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="field">
+                <label>Specify Gender</label>
+                <input type="text"
+                       placeholder="Specify Gender"
+                       id="GenderOther"
+                       name="GenderOther">
+              </div>
+              <div class="required field">
+                <label>Marital Status</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Marital_Status"
+                         name="Marital_Status">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Marital_Status</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Married">Married</div>
+                    <div class="item"
+                         data-value="Widowed">Widowed</div>
+                    <div class="item"
+                         data-value="Separated">Separated</div>
+                    <div class="item"
+                         data-value="Divorced">Divorced</div>
+                    <div class="item"
+                         data-value="Single">Single</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Your Date of Birth (DOB)</label>
+                <input type="date"
+                       placeholder="55/55/5555"
+                       id="DOB"
+                       name="DOB"
+                       required>
+              </div>
+              <div class="required field">
+                <label>Weight (lbs)</label>
+                <input type="text"
+                       placeholder="Weight"
+                       required
+                       id="Weight"
+                       name="Weight">
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Height (feet)</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Height_Feet"
+                         name="Height_Feet">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Height</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="3ft">3ft</div>
+                    <div class="item"
+                         data-value="4ft">4ft</div>
+                    <div class="item"
+                         data-value="5ft">5ft</div>
+                    <div class="item"
+                         data-value="6ft">6ft</div>
+                    <div class="item"
+                         data-value="7ft">7ft</div>
+                    <div class="item"
+                         data-value="8ft">8ft</div>
+                  </div>
+                </div>
+              </div>
+              <div class="required field">
+                <label>Height (inches)</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Height_Inches"
+                         name="Height_Inches">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Height</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="0in">0"</div>
+                    <div class="item"
+                         data-value="1in">1"</div>
+                    <div class="item"
+                         data-value="2in">2"</div>
+                    <div class="item"
+                         data-value="3in">3"</div>
+                    <div class="item"
+                         data-value="4in">4"</div>
+                    <div class="item"
+                         data-value="5in">5"</div>
+                    <div class="item"
+                         data-value="6in">6"</div>
+                    <div class="item"
+                         data-value="7in">7"</div>
+                    <div class="item"
+                         data-value="8in">8"</div>
+                    <div class="item"
+                         data-value="9in">9"</div>
+                    <div class="item"
+                         data-value="10in">10"</div>
+                    <div class="item"
+                         data-value="11in">11"</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields">
+              <?php
+                if($PhysicianState=="Florida"){
+              ?>
+              <div class="required field">
+                <label>Social Security Number</label>
+                <input type="number"
+                       placeholder="Full SSN"
+                       id="SSN"
+                       name="SSN"
+                       required>
+              </div>
+              <?php } ?>
+              <!-- Display only for certain states. -->
+              <?php if($PhysicianState=="Massachusetts"){ ?>
+                <div class="field">
+                  <label>Last 4 Digits of SSN</label>
+                  <input type="text"
+                        placeholder="Last 4 Digits of SSN"
+                        id="SSN4"
+                        name="SSN4">
+                </div>
+              <?php } ?>
+            </div>
+          </div>
+
+          <!-- <div class="ui divider"></div>
+
+          <button id="btnPatientInformation"
+                  class="fluid ui huge primary basic button">Scroll to Identification Documents</button> -->
+        </div>
+        <!-- END SEGMENT: Patient Information -->
+
+        <div id="identificationDocuments"
+             class="ui divider segmentDivider"></div>
+
+        <!-- SEGMENT: Identification Documents -->
+        <h2 class="ui top attached header">
+          Identification Documents
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="field">
+                <label>Patient Registry Number (optional)</label>
+                <input type="text"
+                       placeholder="Patient Registry Number"
+                       id="PatientRegistryNumber"
+                       name="PatientRegistryNumber">
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Drivers License #</label>
+                <input type="text"
+                       placeholder="Drivers License #"
+                       id="Drivers_License"
+                       name="Drivers_License"
+                       required>
+              </div>
+              <div class="required field">
+                <label>Drivers License Issued State</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Drivers_License_State"
+                         name="Drivers_License_State">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">State</div>
+                  <div class="menu stateDropdown">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="field">
+                <label>Drivers License Photo Upload</label>
+                <input type="file"
+                       id="License_Photo"
+                       name="License_Photo">
+              </div>
+            </div>
+
+            <?php if($isCanadian){ ?>
+              <div class="fields">
+                <div class="field">
+                  <label>Province Health Insurance Plan ID Upload</label>
+                  <input type="file"
+                        id="PHIP_Upload"
+                        name="PHIP_Upload">
+                </div>
+              </div>
+            <?php } ?>
+
+            <?php if($PhysicianState=="Connecticut"){ ?>
+              <div class="fields">
+                <div class="field">
+                  <label>Medical Record Diagnosis</label>
+                  <input type="file"
+                        id="CTMedUpload"
+                        name="CTMedUpload">
+                </div>
+              </div>
+            <?php } ?>
+          </div>
+
+          <!-- <div class="ui divider"></div>
+
+          <button id="btnIdentificationDocuments"
+                  class="fluid ui huge primary basic button">Scroll to Emergency Contact</button> -->
+        </div>
+        <!-- END SEGMENT: Identification Documents -->
+
+        <div id="emergencyContact"
+             class="ui divider segmentDivider"></div>
+
+        <!-- SEGMENT: Emergency Contact -->
+        <h2 class="ui top attached header">
+          Emergency Contact
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="field">
+                <label>Emergency Contact Name</label>
+                <input type="text"
+                       placeholder="Emergency Contact Name"
+                       id="Emergency_Contact_Name"
+                       name="Emergency_Contact_Name">
+              </div>
+              <div class="field">
+                <label>Emergency Contact Phone #</label>
+                <input type="tel"
+                       placeholder="555-555-5555"
+                       id="Emergency_Contact_Phone"
+                       name="Emergency_Contact_Phone">
+              </div>
+            </div>
+          </div>
+
+          <!-- <div class="ui divider"></div>
+
+          <button id="btnEmergencyContact"
+                  class="fluid ui huge primary basic button">Save &amp; Proceed</button> -->
+        </div>
+        <!-- END SEGMENT: Emergency Contact -->
+
+        <div id="primaryCarePhysician"
+             class="ui divider segmentDivider"></div>
+
+        <!-- SEGMENT: Primary Care Physician -->
+        <h2 class="ui top attached header">
+          Primary Care Physician
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="field">
+                <label>Primary Care Physician Name</label>
+                <input type="text"
+                       placeholder="Primary Care Physician Name"
+                       id="Primary_Care_Physician_Name"
+                       name="Primary_Care_Physician_Name">
+              </div>
+              <div class="field">
+                <label>Primary Care Physician Phone #</label>
+                <input type="tel"
+                       placeholder="555-555-5555"
+                       id="Primary_Care_Physician_Phone"
+                       name="Primary_Care_Physician_Phone">
+              </div>
+            </div>
+          </div>
+
+          <div class="ui divider"></div>
+
+          <!-- <button id="btnPrimaryCarePhysician"
+                  class="fluid ui huge primary basic button">Save &amp; Proceed</button> -->
+        </div>
+        <!-- END SEGMENT: Primary Care Physician -->
+
+        <div id="guardianInformation"
+             class="ui divider segmentDivider"></div>
+
+        <!-- SEGMENT: Guardian Information -->
+        <h2 class="ui top attached header">
+          Guardian Information
+          <div class="sub header">If the patient is a minor, please fill out the following information.</div>
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="field">
+                <label>Father's Name</label>
+                <input type="text"
+                       placeholder="Father's Name"
+                       id="Fathers_Name"
+                       name="Fathers_Name">
+              </div>
+              <div class="field">
+                <label>Father's Phone #</label>
+                <input type="tel"
+                       placeholder="555-555-5555"
+                       id="Fathers_Phone"
+                       name="Fathers_Phone">
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="field">
+                <label>Mother's Name</label>
+                <input type="text"
+                       placeholder="Mother's Name"
+                       id="Mothers_Name"
+                       name="Mothers_Name">
+              </div>
+              <div class="field">
+                <label>Mother's Phone #</label>
+                <input type="tel"
+                       placeholder="555-555-5555"
+                       id="Mothers_Phone"
+                       name="Mothers_Phone">
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="field">
+                <label>Caregiver's Name</label>
+                <input type="text"
+                       placeholder="Caregiver's Name"
+                       id="Caregivers_Name"
+                       name="Caregivers_Name">
+              </div>
+              <div class="field">
+                <label>Caregiver's Phone #</label>
+                <input type="tel"
+                       placeholder="555-555-5555"
+                       id="Caregivers_Phone"
+                       name="Caregivers_Phone">
+              </div>
+            </div>
+          </div>
+
+          <!-- <div class="ui divider"></div>
+
+          <button id="btnGuardianInformation"
+                  class="fluid ui huge primary basic button">Save &amp; Proceed</button> -->
+        </div>
+        <!-- END SEGMENT: Guardian Information -->
+
+        <div id="currentCondition"
+             class="ui divider segmentDivider"></div>
+
+        <!-- SEGMENT: Current Condition -->
+        <h2 class="ui top attached header">
+          Current Condition
+          <div class="sub header">If known, please tell us which condition are you currently seeking treatment for.
+          </div>
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="field">
+                <label>Qualifying Condition</label>
+                <div class="ui selection dropdown">
+                  <input type="hidden"
+                         id="Qualifying_Condition"
+                         name="Qualifying_Condition">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Qualifying Condition</div>
+                  <div class="menu"
+                       id="conditionDropdown">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Display only if Qualifying Condition == 'Cancer'. -->
+            <div class="fields">
+              <div class="required field">
+                <label>Cancer Type</label>
+                <input type="text"
+                       placeholder="Cancer Type"
+                       id="QC_Cancer_Type"
+                       name="QC_Cancer_Type"
+                       required>
+              </div>
+            </div>
+
+            <!-- Display only if Qualifying Condition == 'Terminal Illness'. -->
+            <div class="fields">
+              <div class="required field">
+                <label>Terminal Illness</label>
+                <input type="text"
+                       placeholder="Terminal Illness"
+                       id="QC_Terminal_Illness"
+                       name="QC_Terminal_Illness"
+                       required>
+              </div>
+            </div>
+
+            <!-- Display only if Qualifying Condition == 'Chronic Nonmalignant Pain'. -->
+            <div class="fields">
+              <div class="required field">
+                <label>Pain Type</label>
+                <input type="text"
+                       placeholder="Pain Type"
+                       id="QC_Pain_Type"
+                       name="QC_Pain_Type"
+                       required>
+              </div>
+            </div>
+
+            <!-- Display only if Qualifying Condition == 'Other. -->
+            <div class="fields">
+              <div class="required field">
+                <label>Other Condition</label>
+                <input type="text"
+                       placeholder="Other Condition"
+                       id="QC_Other"
+                       name="QC_Other"
+                       required>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Describe the problem you would like addressed and when it started.</label>
+                <textarea class="requiredTextarea"
+                          id="History_of_Illness_1"
+                          name="History_of_Illness_1"></textarea>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Have you treated this problem before? How and when?</label>
+                <textarea class="requiredTextarea"
+                          id="History_of_Illness_2"
+                          name="History_of_Illness_2"></textarea>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Please list all illnesses and/or hospitalizations/surgeries you have had in the past.</label>
+                <textarea class="requiredTextarea"
+                          id="Medical_History_1"
+                          name="Medical_History_1"></textarea>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Please list the name and dose of any current medication and/or additional supplements and
+                  vitamins you are taking.</label>
+                <textarea class="requiredTextarea"
+                          id="Medical_History_2"
+                          name="Medical_History_2"></textarea>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Please list any family history of disease.</label>
+                <textarea class="requiredTextarea"
+                          id="Family_History_of_Disease"
+                          name="Family_History_of_Disease"></textarea>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Please list all known allergies.</label>
+                <textarea class="requiredTextarea"
+                          id="Allergies"
+                          name="Allergies"></textarea>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Do you currently use tobacco?</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Current_Tobacco_User"
+                         name="Current_Tobacco_User">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Please Select</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Yes">Yes</div>
+                    <div class="item"
+                         data-value="No">No</div>
+                  </div>
+                </div>
+              </div>
+              <div class="required field">
+                <label>Have you used tobacco in the past?</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Past_Tobacco_User"
+                         name="Past_Tobacco_User">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Please Select</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Yes">Yes</div>
+                    <div class="item"
+                         data-value="No">No</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="required field">
+                <label>Do you currently use recreational drugs?</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Current_Recreation_Drug_User"
+                         name="Current_Recreation_Drug_User">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Please Select</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Yes">Yes</div>
+                    <div class="item"
+                         data-value="No">No</div>
+                  </div>
+                </div>
+              </div>
+              <div class="required field">
+                <label>Are you currently pregnant?</label>
+                <div class="ui selection dropdown requiredDropdown">
+                  <input type="hidden"
+                         id="Pregnant"
+                         name="Pregnant">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Please Select</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Yes">Yes</div>
+                    <div class="item"
+                         data-value="No">No</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="field">
+                <label>Do you exercise regularly?</label>
+                <div class="ui selection dropdown">
+                  <input type="hidden"
+                         id="Exercise_Regularly"
+                         name="Exercise_Regularly">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Please Select</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Yes">Yes</div>
+                    <div class="item"
+                         data-value="No">No</div>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label>How many hours of sleep do you get at night?</label>
+                <input type="text"
+                       placeholder=""
+                       id="Hour_of_Sleep"
+                       name="Hour_of_Sleep">
+              </div>
+            </div>
+
+            <div class="fields">
+              <div class="field">
+                <label>Rate your diet.</label>
+                <div class="ui selection dropdown">
+                  <input type="hidden"
+                         id="Diet_Rating"
+                         name="Diet_Rating">
+                  <i class="dropdown icon"></i>
+                  <div class="default text">Please Select</div>
+                  <div class="menu">
+                    <div class="item"
+                         data-value="Good">Good</div>
+                    <div class="item"
+                         data-value="Fair">Fair</div>
+                    <div class="item"
+                         data-value="Poor">Poor</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fields ui stackable four column grid">
+              <label>Please select any symptoms/conditions that you currently have.</label>
+              <input type="hidden"
+                     id="Symptoms"
+                     name="Symptoms">
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="0"
+                           class="hidden"
+                           value="Headache">
+                    <label>Headache</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="1"
+                           class="hidden"
+                           value="Change in taste, smell, hearing">
+                    <label>Change in taste, smell, hearing</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="2"
+                           class="hidden"
+                           value="Slurred speech or speech problems">
+                    <label>Slurred speech or speech problems</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="3"
+                           class="hidden"
+                           value="Difficulty Swallowing">
+                    <label>Difficulty Swallowing</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="4"
+                           class="hidden"
+                           value="Dizziness">
+                    <label>Dizziness</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="5"
+                           class="hidden"
+                           value="Weakness">
+                    <label>Weakness</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="6"
+                           class="hidden"
+                           value="Numbness">
+                    <label>Numbness</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="7"
+                           class="hidden"
+                           value="Loss of Consciousness">
+                    <label>Loss of Consciousness</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="8"
+                           class="hidden"
+                           value="Faining">
+                    <label>Fainting</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="9"
+                           class="hidden"
+                           value="Seizure">
+                    <label>Seizure</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="10"
+                           class="hidden"
+                           value="Falls">
+                    <label>Falls</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="11"
+                           class="hidden"
+                           value="Tremors">
+                    <label>Tremors</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="12"
+                           class="hidden"
+                           value="Confusion">
+                    <label>Confusion</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="13"
+                           class="hidden"
+                           value="Memory Loss">
+                    <label>Memory Loss</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="14"
+                           class="hidden"
+                           value="Head Trauma">
+                    <label>Head Trauma</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="15"
+                           class="hidden"
+                           value="Sleep Problems">
+                    <label>Sleep Problems</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="16"
+                           class="hidden"
+                           value="Stroke">
+                    <label>Stroke</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="17"
+                           class="hidden"
+                           value="Fever">
+                    <label>Fever</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="18"
+                           class="hidden"
+                           value="Chills">
+                    <label>Chills</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="19"
+                           class="hidden"
+                           value="Fatigue">
+                    <label>Fatigue</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="20"
+                           class="hidden"
+                           value="Weight Gain">
+                    <label>Weight Gain</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="21"
+                           class="hidden"
+                           value="Weight Loss">
+                    <label>Weight Loss</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="22"
+                           class="hidden"
+                           value="HIV/AIDS">
+                    <label>HIV/AIDS</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="23"
+                           class="hidden"
+                           value="Blurry Vision">
+                    <label>Blurry Vision</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="24"
+                           class="hidden"
+                           value="Double Vision">
+                    <label>Double Vision</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="25"
+                           class="hidden"
+                           value="Decreased Vision">
+                    <label>Decreased Vision</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="26"
+                           class="hidden"
+                           value="Cataract">
+                    <label>Cataract</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="27"
+                           class="hidden"
+                           value="Glaucoma">
+                    <label>Glaucoma</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="28"
+                           class="hidden"
+                           value="Hearing Loss">
+                    <label>Hearing Loss</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="29"
+                           class="hidden"
+                           value="Ringing in the ears">
+                    <label>Ringing in the ears</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="30"
+                           class="hidden"
+                           value="Earache">
+                    <label>Earache</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="31"
+                           class="hidden"
+                           value="Vertigo">
+                    <label>Vertigo</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="32"
+                           class="hidden"
+                           value="Chest Pain">
+                    <label>Chest Pain</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="33"
+                           class="hidden"
+                           value="Palpitations">
+                    <label>Palpitations</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="34"
+                           class="hidden"
+                           value="Leg Edema">
+                    <label>Leg Edema</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="35"
+                           class="hidden"
+                           value="High Blood Pressure">
+                    <label>High Blood Pressure</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="36"
+                           class="hidden"
+                           value="Heart Attack">
+                    <label>Heart Attack</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="37"
+                           class="hidden"
+                           value="Coronary Artery Disease">
+                    <label>Coronary Artery Disease</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="38"
+                           class="hidden"
+                           value="Shortness of Breath">
+                    <label>Shortness of Breath</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="39"
+                           class="hidden"
+                           value="Heart Failure">
+                    <label>Heart Failure</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="40"
+                           class="hidden"
+                           value="Cough">
+                    <label>Cough</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="41"
+                           class="hidden"
+                           value="Emphysema">
+                    <label>Emphysema</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="42"
+                           class="hidden"
+                           value="Asthma">
+                    <label>Asthma</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="43"
+                           class="hidden"
+                           value="Nausea">
+                    <label>Nausea</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="44"
+                           class="hidden"
+                           value="Vomiting">
+                    <label>Vomiting</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="45"
+                           class="hidden"
+                           value="Heartburn">
+                    <label>Heartburn</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="46"
+                           class="hidden"
+                           value="Ulcers">
+                    <label>Ulcers</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="47"
+                           class="hidden"
+                           value="Abdominal Pain">
+                    <label>Abdominal Pain</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="48"
+                           class="hidden"
+                           value="Diarrhea">
+                    <label>Diarrhea</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="49"
+                           class="hidden"
+                           value="Constipation">
+                    <label>Constipation</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="50"
+                           class="hidden"
+                           value="Rectal Pain">
+                    <label>Rectal Pain</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="51"
+                           class="hidden"
+                           value="Swallowing Difficulties">
+                    <label>Swallowing Difficulties</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="52"
+                           class="hidden"
+                           value="Hepatitis">
+                    <label>Hepatitis</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="53"
+                           class="hidden"
+                           value="Rash">
+                    <label>Rash</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="54"
+                           class="hidden"
+                           value="Eczema">
+                    <label>Eczema</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="55"
+                           class="hidden"
+                           value="Joint Pain/Swelling">
+                    <label>Joint Pain/Swelling</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="56"
+                           class="hidden"
+                           value="Neck Pain">
+                    <label>Neck Pain</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="57"
+                           class="hidden"
+                           value="Back Pain">
+                    <label>Back Pain</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="58"
+                           class="hidden"
+                           value="Muscle Aches">
+                    <label>Muscle Aches</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="59"
+                           class="hidden"
+                           value="Depression">
+                    <label>Depression</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="60"
+                           class="hidden"
+                           value="Anxiety">
+                    <label>Anxiety</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="61"
+                           class="hidden"
+                           value="Agitation">
+                    <label>Agitation</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="62"
+                           class="hidden"
+                           value="Nervousness">
+                    <label>Nervousness</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="63"
+                           class="hidden"
+                           value="Diabetes">
+                    <label>Diabetes</label>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="64"
+                           class="hidden"
+                           value="Thyroid Problems">
+                    <label>Thyroid Problems</label>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="ui checkbox">
+                    <input type="checkbox"
+                           tabindex="65"
+                           class="hidden"
+                           value="Hormonal Problems">
+                    <label>Hormonal Problems</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- <div class="ui divider"></div>
+
+          <button id="btnCurrentCondition"
+                  class="fluid ui huge primary basic button">Save &amp; Proceed</button> -->
+        </div>
+        <!-- END SEGMENT: Current Condition -->
+
+        <div id="additionalQuestions"
+             class="ui divider segmentDivider">
+        </div>
+
+        <!-- SEGMENT: Additional Questions -->
+        <h2 class="ui top attached header">
+          Additional Questions
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div id="additionalQuestionsContent"
+               class="ui equal width big form"></div>
+
+          <!-- <div class="ui divider"></div>
+
+          <button id="btnAdditionalQuestions"
+                  class="fluid ui huge primary basic button">Save &amp; Proceed</button> -->
+        </div>
+        <!-- END SEGMENT: Additional Questions -->
+
+        <div id="signature"
+             class="ui divider segmentDivider"></div>
+
+        <!-- SEGMENT: Signature -->
+        <h2 class="ui top attached header">
+          Signature
+        </h2>
+        <div class="ui attached tall stacked segment">
+          <div class="ui equal width big form">
+            <div class="fields">
+              <div class="required field">
+                <label>Please write your signature in the box below</label>
+                <div class="js-signature"
+                     id="Signature"
+                     data-auto-fit="true"
+                     data-height="300"
+                     data-border="2px dashed #dee2e6"
+                     data-background="#f8f9fa"
+                     data-line-color="#343a40"
+                     data-line-width="2"></div>
+              </div>
+            </div>
+          </div>
+
+          <button id="btnClearSignature"
+                  class="fluid ui huge button">Clear Signature</button>
+        </div>
+        <!-- END SEGMENT: Signature -->
+
+        <!-- Hidden Inputs -->
+        <input type="hidden"
+               id="PhysicianId"
+               name="PhysicianId">
+        <input type="hidden"
+               id="Access_Code"
+               name="Access_Code">
+        <input type="hidden"
+               id="ExistingId"
+               name="ExistingId">
+        <input type="hidden"
+               id="CustomFields"
+               name="CustomFields">
+        <!-- END: Hidden Inputs -->
+
+        <button id="btnSubmit"
+                class="fluid ui huge green basic button"
+                type="submit">Submit Form</button>
+      </form>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"
+            integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+            crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js"></script>
+    <script src="js/jq-signature.min.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+
+</html>
